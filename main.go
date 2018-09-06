@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
-    "strings"
+	"strings"
 	"sync"
 	"time"
 
@@ -87,6 +87,8 @@ func (c *netflowCollector) processReader(udpSock *net.UDPConn) {
 			for _, record := range p.Records {
 				labels := prometheus.Labels{}
 				counts := make(map[string]float64)
+				labels["inputIface"] = strconv.FormatUint(uint64(record.Input), 10)
+				labels["outputIface"] = strconv.FormatUint(uint64(record.Output), 10)
 				labels["sourceIPv4Address"] = record.SrcAddr.String()
 				labels["destinationIPv4Address"] = record.DstAddr.String()
 				labels["sourceTransportPort"] = strconv.FormatUint(uint64(record.SrcPort), 10)
@@ -94,9 +96,9 @@ func (c *netflowCollector) processReader(udpSock *net.UDPConn) {
 				counts["packetDeltaCount"] = float64(record.Packets)
 				counts["octetDeltaCount"] = float64(record.Bytes)
 				labels["protocolIdentifier"] = strconv.FormatUint(uint64(record.Protocol), 10)
-				labels["tcpControlBits"] = strconv.FormatUint(uint64(record.TCPFlags), 10)
-				labels["bgpSourceAsNumber"] = strconv.FormatUint(uint64(record.SrcAS), 10)
-				labels["bgpDestinationAsNumber"] = strconv.FormatUint(uint64(record.DstAS), 10)
+				//labels["tcpControlBits"] = strconv.FormatUint(uint64(record.TCPFlags), 10)
+				//labels["bgpSourceAsNumber"] = strconv.FormatUint(uint64(record.SrcAS), 10)
+				//labels["bgpDestinationAsNumber"] = strconv.FormatUint(uint64(record.DstAS), 10)
 				labels["sourceIPv4PrefixLength"] = strconv.FormatUint(uint64(record.SrcMask), 10)
 				labels["destinationIPv4PrefixLength"] = strconv.FormatUint(uint64(record.DstMask), 10)
 				if (len(counts) > 0) && (len(labels) > 0) {
@@ -131,7 +133,7 @@ func (c *netflowCollector) processReader(udpSock *net.UDPConn) {
 					}
 					if (len(counts) > 0) && (len(labels) > 0) {
 						labels["From"] = srcAddress.IP.String()
-						labels["TemplateID"] = fmt.Sprintf("%d",record.TemplateID)
+						labels["TemplateID"] = fmt.Sprintf("%d", record.TemplateID)
 						labels["NetflowVersion"] = "9"
 
 						sample := &netflowSample{
@@ -208,14 +210,15 @@ func (c *netflowCollector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 		for key, value := range sample.Counts {
-            desc :=""
+			desc := ""
 			if sample.Labels["TemplateID"] != "" {
 				desc = fmt.Sprintf("netflow_%s_TemplateID%s_%s", sample.Labels["From"], sample.Labels["TemplateID"], key)
 			} else {
-				desc = fmt.Sprintf("netflow_%s_%s", sample.Labels["From"], key)
+				desc = fmt.Sprintf("netflow_%s_%s", "tlin", key)
+				//desc = fmt.Sprintf("netflow_%s_%s", sample.Labels["From"], key)
 			}
-            desc = strings.Replace(desc,".","",-1)
-            log.Infoln(desc)
+			desc = strings.Replace(desc, ".", "", -1)
+			log.Infoln(desc)
 			ch <- MustNewTimeConstMetric(
 				prometheus.NewDesc(desc,
 					fmt.Sprintf("netflow metric %s", key),
@@ -251,7 +254,7 @@ func (m *timeConstMetric) Desc() *prometheus.Desc {
 	return m.metric.Desc()
 }
 func (m *timeConstMetric) Write(out *dto.Metric) error {
-	out.TimestampMs = &m.timestampMs
+	//out.TimestampMs = &m.timestampMs
 	return m.metric.Write(out)
 }
 
