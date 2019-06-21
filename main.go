@@ -31,7 +31,7 @@ var (
 	metricsPath     = flag.String("web.telemetry-path", "/metrics", "Path under which to expose Prometheus metrics.")
 	netflowCollects = flag.String("netflow.collect", "Count$", "Regexp match type is Collect metrics.")
 	netflowExclude  = flag.String("netflow.exclude", "Time", "Regexp match type is not use Label.")
-	sampleExpiry    = flag.Duration("netflow.sample-expiry", 5*time.Minute, "How long a sample is valid for.")
+	sampleExpiry    = flag.Duration("netflow.sample-expiry", 60*time.Minute, "How long a sample is valid for.")
 	lastProcessed   = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "netflow_last_processed_timestamp_seconds",
@@ -43,7 +43,7 @@ var (
 type netflowSample struct {
 	Labels      map[string]string
 	Counts      map[string]float64
-	TimestampMs int64
+	TimestampMs int64 // Last update time
 }
 type netflowCollector struct {
 	ch      chan *netflowSample
@@ -173,10 +173,17 @@ func (c *netflowCollector) processSamples() {
 
 			c.mu.Lock()
 
-			_, ok := c.samples[makeEntryName(sample.Labels)]
+			samplesKey := makeEntryName(sample.Labels)
+			_, exists := c.samples[samplesKey]
 
-			if !ok || (c.samples[makeEntryName(sample.Labels)].TimestampMs < sample.TimestampMs) {
-				c.samples[makeEntryName(sample.Labels)] = sample
+			if !exists {
+				c.samples[samplesKey] = sample
+			} else {
+				// Make samples cumulative by incrementing the flow's counters
+				c.samples[samplesKey].TimestampMs = int64(float64(time.Now().UnixNano()) / 1e6)
+				for key, value := range sample.Counts {
+					c.samples[samplesKey].Counts[key] += value
+				}
 			}
 			c.mu.Unlock()
 		case <-ticker:
@@ -230,6 +237,9 @@ func (c *netflowCollector) Collect(ch chan<- prometheus.Metric) {
 
 func NewTimeConstMetric(desc *prometheus.Desc, valueType prometheus.ValueType,
 	value float64, timestampMs int64) (prometheus.Metric, error) {
+
+	// TODO: Should be updated/refactored to improve error checking
+	//		 Currently always returns nil for error
 	return &timeConstMetric{
 		timestampMs: timestampMs,
 		metric:      prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, value, []string{}...),
@@ -245,6 +255,8 @@ func MustNewTimeConstMetric(desc *prometheus.Desc, valueType prometheus.ValueTyp
 	return m
 }
 
+// TODO: Reconsider if timestampMs even really needed here?
+//		 Doesn't seem to have any use, Prometheus timestamps are based on scrape time.
 type timeConstMetric struct {
 	timestampMs int64
 	metric      prometheus.Metric
