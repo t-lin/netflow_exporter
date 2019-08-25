@@ -71,7 +71,6 @@ func (c *netflowCollector) processReader(udpSock *net.UDPConn) {
 			log.Errorf("Error reading UDP packet from %s: %s", srcAddress, err)
 			continue
 		}
-		timestampMs := int64(float64(time.Now().UnixNano()) / 1e6)
 		d, found := decoders[srcAddress.String()]
 		if !found {
 			s := session.New()
@@ -83,6 +82,7 @@ func (c *netflowCollector) processReader(udpSock *net.UDPConn) {
 		}
 		switch p := m.(type) {
 		case *netflow5.Packet:
+			timestampMs := int64(float64(p.Header.Unix.UnixNano()) / 1e6)
 
 			for _, record := range p.Records {
 				labels := prometheus.Labels{}
@@ -116,6 +116,8 @@ func (c *netflowCollector) processReader(udpSock *net.UDPConn) {
 			}
 
 		case *netflow9.Packet:
+			timestampMs := int64(p.Header.UnixSecs) * 1000
+
 			for _, set := range p.DataFlowSets {
 				for _, record := range set.Records {
 					labels := prometheus.Labels{}
