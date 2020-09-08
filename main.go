@@ -31,7 +31,7 @@ var (
 	metricsPath     = flag.String("web.telemetry-path", "/metrics", "Path under which to expose Prometheus metrics.")
 	netflowCollects = flag.String("netflow.collect", "Count$", "Regexp match type is Collect metrics.")
 	netflowExclude  = flag.String("netflow.exclude", "Time", "Regexp match type is not use Label.")
-	sampleExpiry    = flag.Duration("netflow.sample-expiry", 60*time.Minute, "How long a sample is valid for.")
+	sampleExpiry    = flag.Duration("netflow.sample-expiry", 10*time.Minute, "How long a sample is valid for.")
 	lastProcessed   = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "netflow_last_processed_timestamp_seconds",
@@ -208,13 +208,8 @@ func (c *netflowCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *netflowCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- lastProcessed
 	c.mu.Lock()
-	samples := make([]*netflowSample, 0, len(c.samples))
-	for _, sample := range c.samples {
-		samples = append(samples, sample)
-	}
-	c.mu.Unlock()
 	ageLimit := int64(float64(time.Now().Add(-*sampleExpiry).UnixNano()) / 1e6)
-	for _, sample := range samples {
+	for _, sample := range c.samples {
 		if ageLimit >= sample.TimestampMs {
 			continue
 		}
@@ -235,6 +230,8 @@ func (c *netflowCollector) Collect(ch chan<- prometheus.Metric) {
 				prometheus.GaugeValue, value, sample.TimestampMs)
 		}
 	}
+
+	c.mu.Unlock()
 }
 
 func NewTimeConstMetric(desc *prometheus.Desc, valueType prometheus.ValueType,
