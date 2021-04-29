@@ -101,8 +101,8 @@ func (c *netflowCollector) processReader(udpSock *net.UDPConn) {
 				//labels["tcpControlBits"] = strconv.FormatUint(uint64(record.TCPFlags), 10)
 				//labels["bgpSourceAsNumber"] = strconv.FormatUint(uint64(record.SrcAS), 10)
 				//labels["bgpDestinationAsNumber"] = strconv.FormatUint(uint64(record.DstAS), 10)
-				labels["sourceIPv4PrefixLength"] = strconv.FormatUint(uint64(record.SrcMask), 10)
-				labels["destinationIPv4PrefixLength"] = strconv.FormatUint(uint64(record.DstMask), 10)
+				//labels["sourceIPv4PrefixLength"] = strconv.FormatUint(uint64(record.SrcMask), 10)
+				//labels["destinationIPv4PrefixLength"] = strconv.FormatUint(uint64(record.DstMask), 10)
 				if (len(counts) > 0) && (len(labels) > 0) {
 					labels["From"] = srcAddress.IP.String()
 					labels["NetflowVersion"] = "5"
